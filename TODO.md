@@ -1,0 +1,7 @@
+- [x] Modify lib/screens/history_screen.dart to add tabs for Sent and Received files, improve UI with text, emoji, and animation
+- [x] Modify lib/screens/receive_screen.dart to add received files to history after successful download
+- [x] Modify lib/screens/send_screen.dart to add sent files to history after starting server
+- [x] Modify lib/services/file_share_service.dart to add callback mechanism for when file is downloaded
+- [x] Modify lib/screens/send_screen.dart to pass callback to startServer and add to history when file is downloaded
+- [x] Modify lib/screens/settings_screen.dart to implement clear history functionality with animation
+- [x] Test the changes to ensure history updates correctly
