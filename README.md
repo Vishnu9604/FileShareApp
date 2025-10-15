@@ -20,7 +20,7 @@ A fast and simple Flutter app to share files between devices with ease!
 - **History:** View previous transfers and resend files.
 - **Security:** Encrypted transfers for safety.
 
-
+---
 
 ## 🛠️ Tech Stack
 
