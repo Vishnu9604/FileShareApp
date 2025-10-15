@@ -19,12 +19,12 @@ FileShareApp was created as my Third Year Project for **BSC.CS at Model College,
 ## ✨ Features
 
 - **Cross-platform support:** Works on Android, iOS, and desktop.
-- **Fast file transfer:** Uses Wi-Fi Direct, Bluetooth, or local hotspot.
+- **Network Connection:** The app works seamlessly when both devices are connected to the same Wi-Fi network or a mobile hotspot.
 - **User-friendly UI:** Clean, minimal interface for all ages.
-- **Drag & Drop:** Effortless selection of files.
-- **Preview Files:** See images and documents before sharing.
+-  **QR Code or Manual Entry:** Users can initiate transfers by scanning a QR code for quick pairing or manually entering the receiver’s IP address and port number.
+- **Fast Local Transfers:** Leveraging efficient socket-based communication, Xbean provides lightning-fast transfer speeds for large files.
 - **History:** View previous transfers and resend files.
-- **Security:** Encrypted transfers for safety.
+- **Security:** Files are shared directly between devices on the local network using HTTP sockets and Encrypted transfers for safety.
 
 ---
 
@@ -32,10 +32,13 @@ FileShareApp was created as my Third Year Project for **BSC.CS at Model College,
 
 - **Flutter:** UI framework
 - **Dart:** Programming language
-- **Provider:** State management
-- **Connectivity Plus:** Network detection
-- **Shared Preferences:** Local storage
-- **Custom Backend:** (If any, e.g., Firebase, Node.js)
+- **GoRouter:** For declarative and flexible navigation within the app.
+- **Flutter Riverpod:** A robust state management library used for managing app-wide state like themes and transfer history.
+- **Lottie:** For displaying smooth, scalable animations throughout the user interface.
+- **FilePicker:** A package for picking files from the device's storage.
+- **Mobile Scanner & QR Flutter:** Used for scanning and generating QR codes for easy device pairing.
+- **http:** A networking library for handling the file transfer protocol.
+- **permission_handler:** A package for requesting and checking device permissions.
 
 ---
 
