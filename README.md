@@ -3,6 +3,10 @@
 A fast and simple Flutter app to share files between devices with ease!
 
 ---
+## 📚 About This Project
+
+FileShareApp was created as my Third Year Project for **BSC.CS at Model College, Mumbai University**. The project showcases cross-platform mobile development using Flutter and Dart, focusing on fast, user-friendly file sharing.
+---
 
 ## 🚀 Overview
 
