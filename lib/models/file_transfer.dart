@@ -34,6 +34,9 @@ class FileTransfer {
   final TransferDirection? direction;
   final String? deviceName;
 
+  // New field for progress
+  final double progress;
+
   const FileTransfer({
     required this.id,
     required this.name,
@@ -45,6 +48,7 @@ class FileTransfer {
     this.timestamp,
     this.direction,
     this.deviceName,
+    this.progress = 0.0,
   });
 
   FileTransfer copyWith({
@@ -58,6 +62,7 @@ class FileTransfer {
     DateTime? timestamp,
     TransferDirection? direction,
     String? deviceName,
+    double? progress,
   }) {
     return FileTransfer(
       id: id ?? this.id,
@@ -70,6 +75,7 @@ class FileTransfer {
       timestamp: timestamp ?? this.timestamp,
       direction: direction ?? this.direction,
       deviceName: deviceName ?? this.deviceName,
+      progress: progress ?? this.progress,
     );
   }
 }

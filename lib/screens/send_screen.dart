@@ -24,9 +24,63 @@ class SendScreen extends ConsumerStatefulWidget {
 
 class _SendScreenState extends ConsumerState<SendScreen> {
   final FileShareService _service = FileShareService();
-  String? _selectedFile;
+  List<String> _selectedFiles = [];
+  List<bool> _isSelectedFiles = [];
   String? _ipAddress;
   bool _isServerRunning = false;
+
+  List<String> get _selectedFilePaths {
+    return _selectedFiles.asMap().entries
+        .where((entry) => _isSelectedFiles[entry.key])
+        .map((entry) => entry.value)
+        .toList();
+  }
+
+  int get _selectedCount {
+    return _isSelectedFiles.where((selected) => selected).length;
+  }
+
+  Widget _buildSelectionHeader() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.deepPurple.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.deepPurple.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Icon(Icons.check_circle_outline, color: Colors.deepPurple, size: 20),
+          Expanded(
+            child: Text(
+              'Selected: ${_selectedCount}/${_selectedFiles.length} files',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.deepPurple,
+                fontFamily: 'Montserrat',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          if (_selectedCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isSelectedFiles = List.filled(_selectedFiles.length, true);
+                  });
+                },
+                icon: const Icon(Icons.select_all, size: 16, color: Colors.deepPurple),
+                label: const Text('Select All', style: TextStyle(color: Colors.deepPurple, fontSize: 14)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   FileTypeEnum _mapFileType(FileType type) {
     switch (type) {
@@ -44,55 +98,55 @@ class _SendScreenState extends ConsumerState<SendScreen> {
   }
 
   Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    FilePickerResult? result = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (result != null) {
-      setState(() {
-        _selectedFile = result.files.single.path;
-      });
-    }
-  }
-
-  Future<void> _startServer() async {
-    if (_selectedFile != null) {
-      try {
-        // Use the fileName extension method which handles both / and \ path separators
-        final fileName = _selectedFile!.fileName;
-        await _service.startServer(_selectedFile!, fileName, onFileDownloaded: _addToHistoryAfterShare);
-        final ip = await _service.getLocalIpAddress();
+      final newPaths = result.paths.where((path) => path != null).cast<String>().where((path) => !_selectedFiles.contains(path)).toList();
+      if (newPaths.isNotEmpty) {
         setState(() {
-          _ipAddress = ip;
-          _isServerRunning = true;
+          _selectedFiles.addAll(newPaths);
+          _isSelectedFiles.addAll(List.filled(newPaths.length, true));
         });
-      } catch (e) {
-        print('Error starting server: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to start server: $e')),
-        );
       }
     }
   }
 
-  // Call this method when the file is actually shared successfully
-  void _addToHistoryAfterShare() async {
-    if (_selectedFile != null) {
-      final file = File(_selectedFile!);
-      final size = await file.length();
-      final fileName = _selectedFile!.fileName;
-      final type = _service.getFileType(fileName);
-      final fileTypeEnum = _mapFileType(type);
-      final transfer = FileTransfer(
-        id: DateTime.now().toIso8601String(),
-        name: fileName,
-        path: _selectedFile!,
-        size: size,
-        type: fileTypeEnum,
-        status: FileTransferStatus.completed,
-        timestamp: DateTime.now(),
-        direction: TransferDirection.sent,
-        deviceName: 'Shared via Server',
+  Future<void> _startServerForSelectedFiles() async {
+    try {
+      final selectedPaths = _selectedFilePaths;
+      final fileNames = selectedPaths.map((path) => path.fileName).toList();
+      await _service.startServerForMultipleFiles(selectedPaths, fileNames, onFileDownloaded: (String fileName) => _addToHistory(fileName));
+      final ip = await _service.getLocalIpAddress();
+      setState(() {
+        _ipAddress = ip;
+        _isServerRunning = true;
+      });
+    } catch (e) {
+      print('Error starting server: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to start server: $e')),
       );
-      ref.read(historyProvider.notifier).addTransfer(transfer);
     }
+  }
+
+  void _addToHistory(String fileName) async {
+    // Find the corresponding file path from _selectedFiles
+    final filePath = _selectedFiles.firstWhere((path) => path.fileName == fileName);
+    final file = File(filePath);
+    final size = await file.length();
+    final type = _service.getFileType(fileName);
+    final fileTypeEnum = _mapFileType(type);
+    final transfer = FileTransfer(
+      id: DateTime.now().toIso8601String() + fileName, // unique id
+      name: fileName,
+      path: filePath,
+      size: size,
+      type: fileTypeEnum,
+      status: FileTransferStatus.completed,
+      timestamp: DateTime.now(),
+      direction: TransferDirection.sent,
+      deviceName: 'Shared via Server',
+    );
+    ref.read(historyProvider.notifier).addTransfer(transfer);
   }
 
   @override
@@ -124,14 +178,24 @@ class _SendScreenState extends ConsumerState<SendScreen> {
             child: Column(
               children: [
                 _buildPickFileButton(),
-                if (_selectedFile != null) ...[
+                if (_selectedFiles.isNotEmpty) ...[
                   const SizedBox(height: 24),
-                  _buildFileCard(),
-                  const SizedBox(height: 24),
+                  _buildSelectionHeader(),
+                  const SizedBox(height: 16),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _selectedFiles.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildFileCardWithSelection(_selectedFiles[index], index),
+                      );
+                    },
+                  ),
+                  _buildStartSharingButton(),
                   Lottie.asset('assets/animations/send_screen.json', width: 150, height: 150),
                 ],
-                const SizedBox(height: 32),
-                _buildStartSharingButton(),
                 if (_isServerRunning && _ipAddress != null) ...[
                   const SizedBox(height: 32),
                   _buildServerInfo(),
@@ -139,7 +203,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                   _buildQRCode(),
                   const SizedBox(height: 16),
                   const Text(
-                    'Scan this QR code to download the file',
+                    'Scan this QR code to download the files',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                     textAlign: TextAlign.center,
                   ),
@@ -159,7 +223,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
       child: ElevatedButton.icon(
         onPressed: _pickFile,
         icon: const Icon(Icons.file_upload, size: 24),
-        label: const Text('Pick File', style: TextStyle(fontSize: 18)),
+        label: const Text('Pick Files', style: TextStyle(fontSize: 18)),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.deepPurple,
           foregroundColor: Colors.white,
@@ -171,7 +235,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     );
   }
 
-  Widget _buildFileCard() {
+  Widget _buildFileCardWithSelection(String filePath, int index) {
     return Card(
       elevation: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -180,10 +244,21 @@ class _SendScreenState extends ConsumerState<SendScreen> {
         padding: const EdgeInsets.all(20.0),
         child: Row(
           children: [
+            Checkbox(
+              value: _isSelectedFiles[index],
+              onChanged: (bool? value) {
+                setState(() {
+                  _isSelectedFiles[index] = value ?? false;
+                });
+              },
+              activeColor: Colors.deepPurple,
+              checkColor: Colors.white,
+            ),
+            const SizedBox(width: 8),
             CircleAvatar(
               backgroundColor: Colors.deepPurple.withOpacity(0.15),
               child: Icon(
-                _service.getFileTypeIcon(_service.getFileType(_selectedFile!.fileName)),
+                _service.getFileTypeIcon(_service.getFileType(filePath.fileName)),
                 color: Colors.deepPurple,
                 size: 32,
               ),
@@ -195,7 +270,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _selectedFile!.fileName,
+                    filePath.fileName,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
@@ -206,7 +281,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    _service.getFileTypeName(_service.getFileType(_selectedFile!.fileName)),
+                    _service.getFileTypeName(_service.getFileType(filePath.fileName)),
                     style: TextStyle(
                       color: Colors.grey[700],
                       fontSize: 14,
@@ -226,11 +301,11 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _isServerRunning ? null : _startServer,
+        onPressed: _isServerRunning || _selectedCount == 0 ? null : _startServerForSelectedFiles,
         icon: const Icon(Icons.share, size: 24),
-        label: const Text('Start Sharing', style: TextStyle(fontSize: 18)),
+        label: Text('Start Sharing Selected (${_selectedCount})', style: const TextStyle(fontSize: 18)),
         style: ElevatedButton.styleFrom(
-          backgroundColor: _isServerRunning ? Colors.grey : Colors.green.shade600,
+          backgroundColor: _isServerRunning || _selectedCount == 0 ? Colors.grey : Colors.green.shade600,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

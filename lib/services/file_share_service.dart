@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
@@ -6,8 +7,8 @@ import 'package:device_info_plus/device_info_plus.dart';
 
 class FileShareService {
   HttpServer? _server;
-  String? _filePath; 
-  String? _fileName;
+  List<String> _filePaths = [];
+  List<String> _fileNames = [];
 
   Future<String> getLocalIpAddress() async {
     final interfaces = await NetworkInterface.list();
@@ -21,20 +22,22 @@ class FileShareService {
     return '192.168.1.1'; // fallback
   }
 
-  Future<void> startServer(String filePath, String fileName, {Function()? onFileDownloaded}) async {
-    _filePath = filePath;
-    _fileName = fileName;
+  Future<void> startServerForMultipleFiles(List<String> filePaths, List<String> fileNames, {void Function(String)? onFileDownloaded}) async {
+    _filePaths = filePaths;
+    _fileNames = fileNames;
 
-    // Check if file exists before starting server
-    final file = File(_filePath!);
-    if (!await file.exists()) {
-      throw Exception('File does not exist: $_filePath');
+    // Check if all files exist before starting server
+    for (int i = 0; i < _filePaths.length; i++) {
+      final file = File(_filePaths[i]);
+      if (!await file.exists()) {
+        throw Exception('File does not exist: ${_filePaths[i]}');
+      }
     }
 
-    print('Starting server with file: $_filePath');
-    print('File name: $_fileName');
-    print('File exists: ${await file.exists()}');
-    print('File size: ${await file.length()} bytes');
+    print('Starting server with ${filePaths.length} files');
+    for (int i = 0; i < filePaths.length; i++) {
+      print('File ${i}: ${filePaths[i]} (${fileNames[i]})');
+    }
 
     try {
       // Try to bind to all interfaces first (for network sharing)
@@ -58,12 +61,43 @@ class FileShareService {
     _server!.listen((HttpRequest request) async {
       print('Received request: ${request.method} ${request.uri.path} from ${request.connectionInfo?.remoteAddress}');
 
+      if (request.uri.path == '/files') {
+        // Return list of available files
+        request.response.headers.contentType = ContentType.json;
+        final fileList = _fileNames.map((name) => {'name': name, 'type': _getContentType(name).split('/').first}).toList();
+        request.response.write(jsonEncode({'files': fileList}));
+        await request.response.close();
+        return;
+      }
+
       if (request.uri.path == '/download') {
         try {
-          final file = File(_filePath!);
+          // Check if query parameter 'file' is provided to specify which file to download
+          final fileNameParam = request.uri.queryParameters['file'];
+          String? filePathToServe;
+          String? fileNameToServe;
+
+          if (fileNameParam != null && _fileNames.contains(fileNameParam)) {
+            final index = _fileNames.indexOf(fileNameParam);
+            filePathToServe = _filePaths[index];
+            fileNameToServe = _fileNames[index];
+          } else if (_filePaths.isNotEmpty) {
+            // Default to first file if no query param or invalid
+            filePathToServe = _filePaths[0];
+            fileNameToServe = _fileNames[0];
+          }
+
+          if (filePathToServe == null || fileNameToServe == null) {
+            request.response.statusCode = 404;
+            request.response.write('File not found');
+            await request.response.close();
+            return;
+          }
+
+          final file = File(filePathToServe);
           final fileExists = await file.exists();
 
-          print('Serving file: $_filePath');
+          print('Serving file: $filePathToServe');
           print('File exists: $fileExists');
 
           if (fileExists) {
@@ -71,21 +105,21 @@ class FileShareService {
             print('File size: $fileSize bytes');
 
             // Set appropriate content type based on file extension
-            final contentType = _getContentType(_fileName!);
+            final contentType = _getContentType(fileNameToServe);
             request.response.headers.contentType = ContentType.parse(contentType);
-            request.response.headers.add('Content-Disposition', 'attachment; filename="$_fileName"');
+            request.response.headers.add('Content-Disposition', 'attachment; filename="$fileNameToServe"');
             request.response.headers.add('Content-Length', fileSize.toString());
 
             print('Content-Type: $contentType');
             print('Sending file to client...');
 
             await request.response.addStream(file.openRead());
+            onFileDownloaded?.call(fileNameToServe);
             print('File sent successfully');
-            onFileDownloaded?.call();
           } else {
-            print('File not found: $_filePath');
+            print('File not found: $filePathToServe');
             request.response.statusCode = 404;
-            request.response.write('File not found: $_filePath');
+            request.response.write('File not found: $filePathToServe');
           }
         } catch (e) {
           print('Error serving file: $e');
@@ -120,8 +154,8 @@ class FileShareService {
     }
   }
 
-  Future<String?> downloadFile(String ip, String port, String basePath) async {
-    final url = 'http://$ip:$port/download';
+  Future<String?> downloadFile(String ip, String port, String basePath, {String? fileName}) async {
+    final url = fileName != null ? 'http://$ip:$port/download?file=$fileName' : 'http://$ip:$port/download';
     print('Downloading file from: $url');
     print('Saving to: $basePath');
 
@@ -130,16 +164,16 @@ class FileShareService {
       print('Download response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        String fileName = 'downloaded_file';
+        String downloadedFileName = 'downloaded_file';
         final disposition = response.headers['content-disposition'];
         if (disposition != null) {
           final match = RegExp(r'filename="([^"]+)"').firstMatch(disposition);
           if (match != null) {
-            fileName = match.group(1)!;
+            downloadedFileName = match.group(1)!;
           }
         }
 
-        final savePath = '$basePath/$fileName';
+        final savePath = '$basePath/$downloadedFileName';
         print('Saving file as: $savePath');
 
         // Ensure the directory exists

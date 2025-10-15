@@ -104,6 +104,11 @@ class _HomeScreenState extends State<HomeScreen>
         elevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.swap_horiz),
+            onPressed: () => context.push('/active-transfers'),
+            tooltip: 'Active Transfers',
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => context.push('/settings'),
           ),

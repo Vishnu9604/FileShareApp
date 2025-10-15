@@ -8,6 +8,7 @@ import 'screens/splash_screen.dart';
 import 'screens/send_screen.dart';
 import 'screens/receive_screen.dart';
 import 'screens/history_screen.dart';
+import 'screens/active_transfer_screen.dart';
 import 'providers/theme_provider.dart';
 
 void main() {
@@ -44,6 +45,10 @@ final _router = GoRouter(
     GoRoute(
       path: '/history',
       builder: (context, state) => const HistoryScreen(),
+    ),
+    GoRoute(
+      path: '/active-transfers',
+      builder: (context, state) => const ActiveTransferScreen(),
     ),
   ],
 );
