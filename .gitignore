@@ -43,3 +43,29 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+
+# Temporary files and logs
+*.tmp
+*.temp
+logs/
+*.log
+
+# Database files (if using local databases)
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE and editor files (additional)
+.vscode/settings.json
+.idea/workspace.xml
+
+# Coverage reports
+coverage/
+
+# Firebase config (if sensitive)
+# google-services.json
+# GoogleService-Info.plist
