@@ -20,18 +20,7 @@ A fast and simple Flutter app to share files between devices with ease!
 - **History:** View previous transfers and resend files.
 - **Security:** Encrypted transfers for safety.
 
----
 
-## 🖼️ Screenshots
-
-> _Add screenshots here for better visualization!_
->
-> ```
-> ![Home Screen](assets/screenshots/home.png)
-> ![Transfer Screen](assets/screenshots/transfer.png)
-> ```
-
----
 
 ## 🛠️ Tech Stack
 
